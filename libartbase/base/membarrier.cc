@@ -53,7 +53,16 @@ static bool IsMemBarrierSupported() {
   // MEMBARRIER_CMD_PRIVATE_EXPEDITED is supported since Linux 4.14.
   // MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE is supported since Linux 4.16.
   // Lowest Linux version useful for ART is 4.14.
-  return IsKernelVersionAtLeast(4, 14);
+  if (IsKernelVersionAtLeast(4, 14)) {
+    return true;
+  }
+  // An older kernel with the private expedited commands backported (the Pixel 3a 4.9
+  // kernel) reports them through MEMBARRIER_CMD_QUERY. Callers handle an unsupported
+  // command themselves, as they do on 4.14 and 4.15 kernels without SYNC_CORE.
+  static constexpr int kPrivateExpedited =
+      static_cast<int>(MembarrierCommand::kPrivateExpedited);
+  int commands = syscall(__NR_membarrier, static_cast<int>(MembarrierCommand::kQuery), 0);
+  return commands > 0 && (commands & kPrivateExpedited) != 0;
 }
 
 int membarrier(MembarrierCommand command) {
